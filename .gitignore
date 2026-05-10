@@ -1,0 +1,28 @@
+# Secrets / env
+.env*
+!.REF_DOMAIN
+**/secrets/
+**/*.key
+**/*.pem
+**/*.p12
+**/credentials*
+**/*token*
+
+# Runtime/build/cache
+**/node_modules/
+**/dist/
+**/artifacts/
+**/cache/
+**/coverage/
+**/.next/
+**/tmp/
+**/*.log
+
+# Data/backups
+backups/
+BK/
+env/
+_migration*/
+**/*.sql
+**/*.REF_DOMAIN
+**/storage*/

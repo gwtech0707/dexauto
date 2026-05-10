@@ -1,0 +1,17 @@
+{
+  "BTC": {
+    "intervalSec": 180,
+    "percent": 1,
+    "direction": "up"
+  },
+  "ETH": {
+    "intervalSec": 600,
+    "percent": 2,
+    "direction": "down"
+  },
+  "LINK": {
+    "intervalSec": 300,
+    "percent": 1.5,
+    "direction": "random"
+  }
+}

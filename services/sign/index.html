@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7702 Sign</title>
+
+<link rel="stylesheet" href="REF_DOMAIN">
+
+<script src="REF_URL"></script>
+<script src="REF_URL"></script>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h2>🔐 7702 Sign</h2>
+
+<p><a href="/services/sign/admin/">⚙️ 管理ページ（Admin）へ</a></p>
+
+<button id="connect">ウォレット接続</button>
+
+<div id="account"></div>
+
+<div class="card">
+  <h3>署名内容</h3>
+  <pre id="preview"></pre>
+</div>
+
+<button id="switch">チェーン切替</button>
+<button id="sign">署名する</button>
+
+<div class="card">
+  <h3>実行リクエスト作成（承認待ちへ）</h3>
+  <input id="amount" type="text" placeholder="送金量（例: 3）" />
+  <button id="requestExecute">実行リクエスト作成</button>
+</div>
+
+<div class="card">
+  <h3>結果</h3>
+  <pre id="result"></pre>
+</div>
+
+<div class="card">
+  <h3>QRリンク</h3>
+  <canvas id="qr"></canvas>
+</div>
+
+</div>
+
+<script src="REF_DOMAIN"></script>
+
+</body>
+</html>

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Approvals Admin</title>
+  <style>
+    body { font-family: sans-serif; max-width: 1200px; margin: 24px auto; padding: 0 12px; }
+    input, button { padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    input { width: 100%; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 13px; }
+    th { background: #f5f5f5; }
+    .actions button { width: auto; }
+    pre { background:#111; color:#0f0; padding:10px; overflow:auto; max-height: 260px; }
+    .muted { color:#666; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+    .modal-content {
+      width: min(900px, 95vw);
+      max-height: 90vh;
+      overflow: auto;
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px;
+    }
+  </style>
+</head>
+<body>
+  <h2>承認待ち実行</h2>
+  <p><a href="/services/sign/admin/">← Adminトップへ</a></p>
+
+  <label>Admin Token</label>
+  <input id="adminToken" placeholder="ADMIN_TOKEN" />
+  <button id="loadPending">承認待ちを読み込み</button>
+
+  <table id="pendingTable">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>authId</th>
+        <th>Token</th>
+        <th>owner</th>
+        <th>Payer(Rayer)</th>
+        <th>Contract</th>
+        <th>Amount Base</th>
+        <th>Date</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody id="pendingBody">
+      <tr><td colspan="9" class="muted">まだデータがありません</td></tr>
+    </tbody>
+  </table>
+
+  <div class="modal" id="detailModal">
+    <div class="modal-content">
+      <h3>詳細 / 承認実行</h3>
+      <div id="detailMeta" class="muted"></div>
+      <div id="payerBalance" class="muted"></div>
+
+      <label>承認amount（人間向け。例: 3）</label>
+      <input id="approveAmount" placeholder="例: 3" />
+
+      <button id="approveBtn">このrequestを承認実行</button>
+      <button id="closeModal">閉じる</button>
+
+      <h4>署名内容</h4>
+      <pre id="detailJson">-</pre>
+    </div>
+  </div>
+
+  <h3>結果</h3>
+  <pre id="out">-</pre>
+
+  <script src="./REF_DOMAIN"></script>
+</body>
+</html>

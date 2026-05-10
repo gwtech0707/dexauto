@@ -1,0 +1,27 @@
+# common excludes
+node_modules/
+venv/
+.env
+.env.*
+*.log
+*.tmp
+.DS_Store
+
+# build/cache
+.next/
+dist/
+build/
+coverage/
+.cache/
+
+# secrets
+*.key
+*.pem
+*.p12
+*.keystore
+mnemonic*
+private*
+
+# artifacts
+artifacts/
+cache/

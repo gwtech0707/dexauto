@@ -1,0 +1,377 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "../interfaces/REF_DOMAIN";
+import "../interfaces/REF_DOMAIN";
+import "../interfaces/REF_DOMAIN";
+
+contract PerpetualTrading is IPerp {
+
+    /* ===================================================== */
+    /* ======================= STRUCT ====================== */
+    /* ===================================================== */
+
+    struct Position {
+        bytes32 pair;
+        int256 size;
+        uint256 entryPrice;
+        uint256 margin;
+        bool isOpen;
+    }
+
+    /* ===================================================== */
+    /* ======================= STATE ======================= */
+    /* ===================================================== */
+
+    address public owner;
+    address public router;
+    address public liquidationEngine;
+
+    IOracle public oracle;
+    ILiquidityPool public liquidityPool;
+
+    uint256 public nextPositionId;
+
+    mapping(address => uint256[]) private userPositionIds;
+    mapping(address => mapping(uint256 => Position)) public positions;
+    mapping(address => uint256) public traderMargin;
+
+    // realized profit (claimable)
+    mapping(address => int256) public claimablePnL;
+
+    /* ===================================================== */
+    /* ====================== MODIFIERS ==================== */
+    /* ===================================================== */
+
+    modifier onlyOwner() {
+        require(REF_DOMAIN == owner, "NOT_OWNER");
+        _;
+    }
+
+    modifier onlyRouter() {
+        require(REF_DOMAIN == router, "NOT_ROUTER");
+        _;
+    }
+
+    modifier onlyLiquidation() {
+        require(REF_DOMAIN == liquidationEngine, "NOT_LIQUIDATION");
+        _;
+    }
+
+    constructor(address _oracle, address _liquidityPool) {
+        owner = REF_DOMAIN;
+        oracle = IOracle(_oracle);
+        liquidityPool = ILiquidityPool(_liquidityPool);
+    }
+
+    /* ===================================================== */
+    /* ====================== ADMIN ======================== */
+    /* ===================================================== */
+
+    function setRouter(address _router) external onlyOwner {
+        router = _router;
+    }
+
+    function setLiquidationEngine(address _engine) external onlyOwner {
+        liquidationEngine = _engine;
+    }
+
+    /* ===================================================== */
+    /* ====================== MARGIN ======================= */
+    /* ===================================================== */
+
+    function onTraderDeposit(address user, uint256 amount)
+        external
+        onlyRouter
+    {
+        traderMargin[user] += amount;
+    }
+
+    function onTraderWithdraw(address user, uint256 amount)
+        external
+        onlyRouter
+    {
+        require(traderMargin[user] >= amount, "INSUFFICIENT_MARGIN");
+        traderMargin[user] -= amount;
+    }
+
+    /* ===================================================== */
+    /* ===================== POSITION ====================== */
+    /* ===================================================== */
+
+    function openPosition(
+        address user,
+        bytes32 pair,
+        int256 size
+    )
+        external
+        onlyRouter
+        returns (uint256 positionId)
+    {
+        require(size != 0, "INVALID_SIZE");
+        require(traderMargin[user] > 0, "NO_MARGIN");
+
+        uint256 price = REF_DOMAIN(pair);
+
+        positionId = nextPositionId++;
+        userPositionIds[user].push(positionId);
+
+        positions[user][positionId] = Position({
+            pair: pair,
+            size: size,
+            entryPrice: price,
+            margin: traderMargin[user],
+            isOpen: true
+        });
+    }
+
+    /* ===================================================== */
+    /* ====================== FULL CLOSE =================== */
+    /* ===================================================== */
+
+    function closePosition(address user, uint256 positionId)
+        external
+        onlyRouter
+    {
+        Position storage pos = positions[user][positionId];
+        require(REF_DOMAIN, "NO_POSITION");
+
+        uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
+
+        int256 realizedPnL =
+            (REF_DOMAIN * int256(exitPrice - REF_DOMAIN))
+            / int256(REF_DOMAIN);
+
+        if (realizedPnL < 0) {
+            REF_DOMAIN(user, realizedPnL);
+        } else if (realizedPnL > 0) {
+            claimablePnL[user] += realizedPnL;
+        }
+
+        int256 closedSize = REF_DOMAIN;
+
+        REF_DOMAIN = 0;
+        REF_DOMAIN = false;
+
+        emit PositionClosed(
+            user,
+            positionId,
+            REF_DOMAIN,
+            closedSize,
+            REF_DOMAIN,
+            exitPrice,
+            realizedPnL,
+            REF_DOMAIN
+        );
+    }
+
+    /* ===================================================== */
+    /* =================== PARTIAL CLOSE =================== */
+    /* ===================================================== */
+
+    function closePositionPartial(
+        address user,
+        uint256 positionId,
+        int256 closeSize
+    )
+        external
+        onlyRouter
+    {
+        Position storage pos = positions[user][positionId];
+
+        require(REF_DOMAIN, "NO_POSITION");
+        require(closeSize != 0, "INVALID_CLOSE_SIZE");
+        require(
+            (REF_DOMAIN > 0 && closeSize > 0) ||
+            (REF_DOMAIN < 0 && closeSize < 0),
+            "WRONG_DIRECTION"
+        );
+
+        int256 absTotal = _abs(REF_DOMAIN);
+        int256 absClose = _abs(closeSize);
+        require(absClose <= absTotal, "CLOSE_TOO_LARGE");
+
+        uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
+
+        int256 totalPnL =
+            (REF_DOMAIN * int256(exitPrice - REF_DOMAIN))
+            / int256(REF_DOMAIN);
+
+        int256 partialPnL =
+            (totalPnL * closeSize) / REF_DOMAIN;
+
+        if (partialPnL < 0) {
+            REF_DOMAIN(user, partialPnL);
+        } else if (partialPnL > 0) {
+            claimablePnL[user] += partialPnL;
+        }
+
+        uint256 marginReduction =
+            (REF_DOMAIN * uint256(absClose)) / uint256(absTotal);
+
+        REF_DOMAIN -= marginReduction;
+        REF_DOMAIN -= closeSize;
+
+        emit PositionPartiallyClosed(
+            user,
+            positionId,
+            REF_DOMAIN,
+            closeSize,
+            exitPrice,
+            partialPnL,
+            REF_DOMAIN,
+            REF_DOMAIN
+        );
+
+        if (REF_DOMAIN == 0) {
+            REF_DOMAIN = false;
+
+            emit PositionClosed(
+                user,
+                positionId,
+                REF_DOMAIN,
+                closeSize,
+                REF_DOMAIN,
+                exitPrice,
+                partialPnL,
+                REF_DOMAIN
+            );
+        }
+    }
+
+    /* ===================================================== */
+    /* ===================== LIQUIDATE ===================== */
+    /* ===================================================== */
+
+    function liquidate(address user, uint256 positionId)
+        external
+        onlyLiquidation
+    {
+        Position storage pos = positions[user][positionId];
+        require(REF_DOMAIN, "NO_POSITION");
+
+        uint256 price = REF_DOMAIN(REF_DOMAIN);
+
+        int256 realizedPnL =
+            (REF_DOMAIN * int256(price - REF_DOMAIN))
+            / int256(REF_DOMAIN);
+
+        REF_DOMAIN = false;
+
+        emit PositionLiquidated(
+            user,
+            positionId,
+            REF_DOMAIN,
+            REF_DOMAIN,
+            price,
+            realizedPnL,
+            REF_DOMAIN
+        );
+    }
+
+    /* ===================================================== */
+    /* ====================== PNL ========================== */
+    /* ===================================================== */
+
+    function claimPnL(address user)
+        external
+        onlyRouter
+    {
+        int256 pnl = claimablePnL[user];
+        require(pnl > 0, "NO_PROFIT");
+
+        claimablePnL[user] = 0;
+        REF_DOMAIN(user, uint256(pnl));
+    }
+
+    function getClaimablePnL(address user)
+        external
+        view
+        returns (int256)
+    {
+        return claimablePnL[user];
+    }
+
+    /* ===================================================== */
+    /* ======================= VIEWS ======================= */
+    /* ===================================================== */
+
+    function getPosition(address user, uint256 positionId)
+        external
+        view
+        returns (
+            bytes32 pair,
+            int256 size,
+            uint256 entryPrice,
+            uint256 margin,
+            bool isOpen
+        )
+    {
+        Position memory p = positions[user][positionId];
+        return (REF_DOMAIN, REF_DOMAIN, REF_DOMAIN, REF_DOMAIN, REF_DOMAIN);
+    }
+
+    function getMargin(address user)
+        external
+        view
+        returns (uint256)
+    {
+        return traderMargin[user];
+    }
+
+    function getUserPositionIds(address user)
+        external
+        view
+        returns (uint256[] memory)
+    {
+        return userPositionIds[user];
+    }
+
+    /* ===================================================== */
+    /* ====================== INTERNAL ===================== */
+    /* ===================================================== */
+
+    function _abs(int256 x) internal pure returns (int256) {
+        return x >= 0 ? x : -x;
+    }
+}
+/* ===================================================== */
+I/* =================== LIQUIDATION CHECK =============== */
+/* ===================================================== */
+
+uint256 public constant ONE = 1e18;
+uint256 public maintenanceMargin = 5e16; // 5%
+
+function isLiquidatable(address user, uint256 positionId)
+    public
+    view
+    returns (bool)
+{
+    Position memory p = positions[user][positionId];
+
+    if (!REF_DOMAIN) return false;
+
+    uint256 price = REF_DOMAIN(REF_DOMAIN);
+
+    int256 pnl = _calcPnL(p, price);
+    int256 equity = int256(REF_DOMAIN) + pnl;
+
+    if (equity <= 0) return true;
+
+    uint256 positionSizeAbs = uint256(_abs(REF_DOMAIN));
+    if (positionSizeAbs == 0) return false;
+
+    uint256 marginRatio =
+        (uint256(equity) * ONE) / positionSizeAbs;
+
+    return marginRatio < maintenanceMargin;
+}
+
+function _calcPnL(Position memory p, uint256 price)
+    internal
+    pure
+    returns (int256)
+{
+    int256 priceDiff = int256(price) - int256(REF_DOMAIN);
+    return (REF_DOMAIN * priceDiff) / int256(REF_DOMAIN);
+}

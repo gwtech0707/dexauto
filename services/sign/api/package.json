@@ -1,0 +1,21 @@
+{
+  "name": "api",
+  "version": "1.0.0",
+  "description": "",
+  "main": "REF_DOMAIN",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node REF_DOMAIN"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "ethers": "^6.16.0",
+    "express": "^5.2.1",
+    "mysql2": "^3.20.0",
+    "solc": "^0.8.34"
+  }
+}

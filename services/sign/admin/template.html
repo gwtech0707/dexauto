@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Template Admin</title>
+  <style>
+    body { font-family: sans-serif; max-width: 900px; margin: 24px auto; padding: 0 12px; }
+    input, select, button { width: 100%; padding: 10px; margin: 6px 0; box-sizing: border-box; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .muted { color:#666; font-size:12px; }
+    pre { background:#111; color:#0f0; padding:10px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <h2>署名テンプレ管理</h2>
+  <p><a href="/services/sign/admin/">← Adminトップへ</a></p>
+
+  <label>Admin Token</label>
+  <input id="adminToken" placeholder="ADMIN_TOKEN" />
+  <div class="row">
+    <button id="load">現在値を読み込み</button>
+    <button id="reloadOptions">候補を再読込</button>
+  </div>
+
+  <hr/>
+  <label>chain_id</label>
+  <input id="chain_id" value="1" />
+
+  <label>contract_address（候補）</label>
+  <select id="contract_select"></select>
+  <input id="contract_address" placeholder="0x...（手入力可）" />
+
+  <label>token（候補）</label>
+  <select id="token_select"></select>
+  <input id="token_addr" placeholder="ETHなら空 or 0x000...、ERC20なら0x..." />
+  <div class="muted" id="token_meta">token: -</div>
+
+  <label>to_address（候補）</label>
+  <select id="to_select"></select>
+  <input id="to_address" placeholder="0x...（手入力可）" />
+
+  <div class="row">
+    <div>
+      <label>max_amount（人間が読む量）</label>
+      <input id="max_human" placeholder="例: 100" />
+    </div>
+    <div>
+      <label>max_amount（DB保存値 / base units）</label>
+      <input id="max_amount" placeholder="自動計算" />
+    </div>
+  </div>
+  <div class="muted" id="max_help">token小数桁に合わせて自動計算されます</div>
+
+  <div class="row">
+    <div>
+      <label>deadline (unix sec)</label>
+      <input id="deadline" />
+    </div>
+    <div>
+      <label>nonce</label>
+      <input id="nonce" />
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="genNonce">nonceを現在時刻で生成</button>
+    <button id="save">保存（新テンプレ作成）</button>
+  </div>
+
+  <h3>結果</h3>
+  <pre id="out">-</pre>
+
+  <script src="./REF_DOMAIN"></script>
+</body>
+</html>
