@@ -166,3 +166,81 @@ Akiの判断と一致する。
 **次に判断が必要な事項の更新**: 上記3項目は「見送り・現状維持」で確定したため、
 今後再検討が必要になるのはテスト追加やhardhatメジャーアップを計画するタイミングの
 みで、それまでは追加対応不要。
+
+---
+
+## 2026-07-25: クライアント納品に向けた残課題対応（項目1・3、項目2準備）
+
+**対応**: 指示書`2026-07-25_クライアント納品に向けた残課題対応.md`に基づき、以下を実施。
+
+### 項目1: 外部CDN依存の解消
+
+`services/sign/`にpackage.jsonを新規作成し、`ethers@6.17.0`・`qrcode@1.5.4`をnpmで
+インストール。ethersは同梱のUMDビルド（`dist/ethers.umd.min.js`）を、qrcodeは
+事前ビルド済みブラウザバンドルが同梱されていなかったため`esbuild`でIIFEバンドル
+（グローバル名`QRCode`）を生成し、いずれも`services/sign/vendor/`へ配置。
+`index.html`の空欄`<script src="">`2つを`./vendor/ethers.umd.min.js`・
+`./vendor/qrcode.min.js`のローカル参照に切り替えた。
+
+**確認**: Node.js `vm`モジュールでブラウザ相当のグローバルコンテキストを用意し、
+両バンドルを実行して`ethers.BrowserProvider`・`QRCode.toCanvas`が関数として
+利用可能であることを確認済み（Claude in Chrome拡張が未セットアップのため、
+実ブラウザでの目視確認は未実施）。
+
+**判断根拠**: `app.js`にはQRコードを実際に描画する呼び出しコード自体が存在しない
+（`canvas#qr`要素はあるが、`QRCode.toCanvas`等を呼ぶロジックがapp.js内に見当たらない）。
+これはサニタイズ/復元の過程でQR描画ロジック自体が失われた可能性がある。今回の指示は
+「外部CDN依存の解消」であり新機能追加はスコープ外のため、QR描画ロジックの新規実装は
+行っていない。ライブラリの読み込み自体は完了しているため、将来QR機能を実装する際は
+`QRCode.toCanvas(document.getElementById('qr'), url)`のような呼び出しを追加するだけで
+良い状態になっている。
+
+### 項目3: admin/main.jsの削除
+
+`services/sign/admin/`配下の全HTML（`index.html`/`template.html`/`approvals.html`）に
+`main.js`への参照がないことを`grep`で最終確認した上で`git rm`で削除。
+
+### 項目2: Docker MySQL構築・DDL作成・DB層の実クエリ検証（Sepolia実行は未実施）
+
+Akiの承認範囲に従い、Sepolia上での実際のトランザクション実行には進まず、以下まで実施。
+
+1. **Docker MySQLコンテナ**: `dexauto-mysql-test`という名前で`mysql:8.0`イメージの
+   使い捨てコンテナを起動（`127.0.0.1:3306`にバインド、DB名`dex_core`）。sudo不要。
+2. **DDL作成**: `services/sign/api/db/schema.sql`に`authorizations`・`signatures`・
+   `execution_requests`の3テーブルを新規作成。列名は`api/routes/*.js`のSQL文から
+   逐語的に洗い出した（前回の推測復元時に把握していた列名と矛盾なし。ただし
+   `execution_requests.error`列は前回の把握リストに明記されていなかったため今回追加で確認）
+3. **DDLをコンテナへ適用**し、`.env`（`DB_HOST`/`DB_USER`/`DB_PASS`/`DB_NAME`/
+   `ADMIN_TOKEN`/`PORT`）を用意して`server.js`を実際に起動し、以下のエンドポイントを
+   実クエリで検証（ポート3001が別サービス「Uptime Kuma」と衝突したため検証時のみ
+   ポート3901を使用。これはこの共有ホスト上の無関係な既存サービスであり、dexauto側の
+   問題ではない）:
+   - `POST /admin/authorization/update`: OK（TEMPLATE行のINSERT成功）
+   - `GET /admin/authorization/latest`: OK
+   - `GET /admin/options`: **バグを発見・修正**（下記参照）
+   - `GET /sign-data`: OK（owner未登録時のINSERT・登録済み時のUPDATEとも成功）
+   - `POST /save-signature`: OK（`ethers.Wallet.createRandom()`で生成した使い捨てテスト
+     ウォレットで実際にEIP-712署名を作成し、`signatures`・`execution_requests`両方への
+     INSERTを確認）
+   - `POST /execute`: 意図通り`"unsupported chain"`で停止（`RPC_URL`未設定のため。
+     Sepolia RPCに実際にアクセスする一歩手前で正しく止まることを確認）
+   - `GET /execute/pending`: OK（`execution_requests`と`authorizations`のJOINが正しく
+     動作。RPC未設定によりウォレット残高部分のみ`null`で正常にグレースフルデグレード）
+
+**発見したバグと修正**: `api/routes/admin.js`の`/admin/options`が
+`SELECT DISTINCT contract_address, token, to_address FROM authorizations ORDER BY id DESC LIMIT 300`
+という、MySQLの厳格モードでは`ER_FIELD_IN_ORDER_NOT_SELECT`エラーになるSQLだった
+（DISTINCTと、SELECT対象に含まれない列でのORDER BYの組み合わせが不可）。「直近300件から
+重複除去する」という意図を保つため、サブクエリで先に`ORDER BY id DESC LIMIT 300`を
+実行し、その結果に対して外側で`SELECT DISTINCT`をかける形に修正。これは列名の推測ミス
+ではなく、サニタイズ以前から存在していた可能性のあるロジックバグ。修正後、実DBに対して
+正常動作を確認済み。
+
+**未検証のまま残る範囲**: `execute/approve`の実処理（`executeTransfer`関数によるオンチェーン
+トランザクション実行と、それに伴う`authorizations.used_amount`更新・
+`execution_requests.status='approved'`更新・失敗時の`status='failed'`更新）は、
+実際のSepolia RPC・秘密鍵が必要なため今回は未実施。Sepolia実行の承認が得られ次第、
+この部分を検証する。
+
+**次に判断が必要な事項**: Sepolia上での実際のトランザクション実行（デプロイ・
+approve・execute/approve）に進んでよいか。Akiへの確認待ち。

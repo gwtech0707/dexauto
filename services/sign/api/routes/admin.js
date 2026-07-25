@@ -30,9 +30,12 @@ router.get("/admin/options", requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT DISTINCT contract_address, token, to_address
-       FROM authorizations
-       ORDER BY id DESC
-       LIMIT 300`
+       FROM (
+         SELECT contract_address, token, to_address, id
+         FROM authorizations
+         ORDER BY id DESC
+         LIMIT 300
+       ) recent`
     );
 
     const contracts = [...new Set(rows.map((r) => r.contract_address).filter(Boolean))];
