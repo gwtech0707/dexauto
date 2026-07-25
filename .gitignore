@@ -26,5 +26,6 @@ BK/
 env/
 _migration*/
 **/*.sql
+!**/db/schema.sql
 **/*.bak
 **/storage*/
