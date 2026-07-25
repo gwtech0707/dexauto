@@ -1,12 +1,14 @@
 # Secrets / env
 .env*
-!.REF_DOMAIN
+!.env.example
 **/secrets/
 **/*.key
 **/*.pem
 **/*.p12
 **/credentials*
 **/*token*
+!**/tokens/
+!**/tokens/*.sol
 
 # Runtime/build/cache
 **/node_modules/
@@ -24,5 +26,5 @@ BK/
 env/
 _migration*/
 **/*.sql
-**/*.REF_DOMAIN
+**/*.bak
 **/storage*/

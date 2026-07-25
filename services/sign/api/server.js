@@ -1,4 +1,4 @@
-// ファイル: /var/www/REF_DOMAIN/services/sign/api/REF_DOMAIN
+// ファイル: services/sign/api/server.js
 
 require("dotenv").config();
 
@@ -8,15 +8,15 @@ const cors = require("cors");
 const app = express();
 
 /* ミドルウェア */
-REF_DOMAIN(cors());
-REF_DOMAIN(REF_DOMAIN());
+app.use(cors());
+app.use(express.json());
 
 // 一時デバッグ: API到達確認ログ
-REF_DOMAIN((req, res, next) => {
-  const started = REF_DOMAIN();
-  REF_DOMAIN("finish", () => {
-    const ms = REF_DOMAIN() - started;
-    REF_DOMAIN(`[api] ${REF_DOMAIN} ${REF_DOMAIN} -> ${REF_DOMAIN} (${ms}ms)`);
+app.use((req, res, next) => {
+  const started = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - started;
+    console.log(`[api] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${ms}ms)`);
   });
   next();
 });
@@ -27,13 +27,13 @@ const executeRoutes = require("./routes/execute");
 const adminRoutes = require("./routes/admin");
 
 /* APIパス */
-REF_DOMAIN("/services/sign/api", signRoutes);
-REF_DOMAIN("/services/sign/api", executeRoutes);
-REF_DOMAIN("/services/sign/api", adminRoutes);
+app.use("/services/sign/api", signRoutes);
+app.use("/services/sign/api", executeRoutes);
+app.use("/services/sign/api", adminRoutes);
 
 /* 起動 */
-const PORT = REF_DOMAIN || 3001;
+const PORT = process.env.PORT || 3001;
 
-REF_DOMAIN(PORT, () => {
-  REF_DOMAIN(`✅ API running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`✅ API running on port ${PORT}`);
 });

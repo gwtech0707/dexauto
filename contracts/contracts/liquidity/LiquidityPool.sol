@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/REF_DOMAIN";
-import "../tokens/REF_DOMAIN";
-import "@openzeppelin/contracts/token/ERC20/REF_DOMAIN";
+import "../interfaces/ILiquidityPool.sol";
+import "../tokens/PLP.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title LiquidityPool
@@ -26,22 +26,22 @@ contract LiquidityPool is ILiquidityPool {
     /* ===================================================== */
 
     modifier onlyOwner() {
-        require(REF_DOMAIN == owner, "NOT_OWNER");
+        require(msg.sender == owner, "NOT_OWNER");
         _;
     }
 
     modifier onlyPerp() {
-        require(REF_DOMAIN == perp, "NOT_PERP");
+        require(msg.sender == perp, "NOT_PERP");
         _;
     }
 
     modifier onlyRouter() {
-        require(REF_DOMAIN == router, "NOT_ROUTER");
+        require(msg.sender == router, "NOT_ROUTER");
         _;
     }
 
     constructor(address _collateralToken, address _plp) {
-        owner = REF_DOMAIN;
+        owner = msg.sender;
         collateralToken = IERC20(_collateralToken);
         plp = PLP(_plp);
     }
@@ -71,13 +71,13 @@ contract LiquidityPool is ILiquidityPool {
     function lpDeposit(uint256 amount) external {
         require(amount > 0, "ZERO_AMOUNT");
 
-        REF_DOMAIN(
-            REF_DOMAIN,
+        collateralToken.transferFrom(
+            msg.sender,
             address(this),
             amount
         );
 
-        REF_DOMAIN(REF_DOMAIN, amount);
+        plp.mint(msg.sender, amount);
     }
 
     /**
@@ -90,8 +90,8 @@ contract LiquidityPool is ILiquidityPool {
         uint256 nav = getPLPNAV();
         uint256 withdrawAmount = (plpAmount * nav) / 1e18;
 
-        REF_DOMAIN(REF_DOMAIN, plpAmount);
-        REF_DOMAIN(REF_DOMAIN, withdrawAmount);
+        plp.burn(msg.sender, plpAmount);
+        collateralToken.transfer(msg.sender, withdrawAmount);
     }
 
 /* ===================================================== */
@@ -105,7 +105,7 @@ function payProfit(address user, uint256 amount)
 {
     require(amount > 0, "ZERO_AMOUNT");
 
-    REF_DOMAIN(user, amount);
+    collateralToken.transfer(user, amount);
 }
 
 
@@ -117,7 +117,7 @@ function payProfit(address user, uint256 amount)
     {
         require(amount > 0, "ZERO_AMOUNT");
 
-        REF_DOMAIN(
+        collateralToken.transferFrom(
             user,
             address(this),
             amount
@@ -135,7 +135,7 @@ function payProfit(address user, uint256 amount)
         require(traderBalances[user] >= amount, "INSUFFICIENT_BALANCE");
 
         traderBalances[user] -= amount;
-        REF_DOMAIN(user, amount);
+        collateralToken.transfer(user, amount);
     }
 
     /// @notice Settle trader PnL (loss only for now)
@@ -162,17 +162,17 @@ function payProfit(address user, uint256 amount)
         override
         returns (uint256)
     {
-        return REF_DOMAIN(address(this));
+        return collateralToken.balanceOf(address(this));
     }
 
     /**
      * @notice PLP Net Asset Value (18 decimals)
      */
     function getPLPNAV() public view returns (uint256) {
-        uint256 supply = REF_DOMAIN();
+        uint256 supply = plp.totalSupply();
         if (supply == 0) return 1e18;
 
-        uint256 poolValue = REF_DOMAIN(address(this));
+        uint256 poolValue = collateralToken.balanceOf(address(this));
         return (poolValue * 1e18) / supply;
     }
 }

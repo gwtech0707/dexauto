@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/REF_DOMAIN";
-import "../interfaces/REF_DOMAIN";
-import "../interfaces/REF_DOMAIN";
+import "../interfaces/IPerp.sol";
+import "../interfaces/ILiquidityPool.sol";
+import "../interfaces/IOracle.sol";
 
 contract Router {
 
@@ -41,12 +41,12 @@ contract Router {
     /* ===================================================== */
 
     function deposit(uint256 amount) external {
-        REF_DOMAIN(REF_DOMAIN, amount);
-        REF_DOMAIN(REF_DOMAIN, amount);
+        liquidityPool.deposit(msg.sender, amount);
+        perp.onTraderDeposit(msg.sender, amount);
     }
 
     function withdraw(uint256 amount) external {
-        REF_DOMAIN(REF_DOMAIN, amount);
+        perp.onTraderWithdraw(msg.sender, amount);
     }
 
     /* ===================================================== */
@@ -57,7 +57,7 @@ contract Router {
         external
         returns (uint256)
     {
-        return REF_DOMAIN(REF_DOMAIN, pair, size);
+        return perp.openPosition(msg.sender, pair, size);
     }
 
     /**
@@ -77,26 +77,26 @@ contract Router {
             uint256 entryPrice,
             ,
             bool isOpen
-        ) = REF_DOMAIN(REF_DOMAIN, positionId);
+        ) = perp.getPosition(msg.sender, positionId);
 
         require(isOpen, "POSITION_NOT_OPEN");
 
         // ===== 2. exit price（event 用）=====
-        uint256 exitPrice = REF_DOMAIN(pair);
+        uint256 exitPrice = oracle.getPrice(pair);
 
         // ===== 3. close (SSOT: PerpetualTrading) =====
-        REF_DOMAIN(REF_DOMAIN, positionId);
+        perp.closePosition(msg.sender, positionId);
 
         // ===== 4. emit event (履歴用途のみ) =====
         emit PositionClosed(
-            REF_DOMAIN,
+            msg.sender,
             positionId,
             pair,
             size,
             entryPrice,
             exitPrice,
             0, // Router では pnl を確定しない
-            REF_DOMAIN
+            block.timestamp
         );
     }
 
@@ -105,7 +105,7 @@ contract Router {
         int256 closeSize
     ) external {
         // 部分クローズのロジック・精算は Perpetual 側
-        REF_DOMAIN(REF_DOMAIN, positionId, closeSize);
+        perp.closePositionPartial(msg.sender, positionId, closeSize);
     }
 
     /* ===================================================== */
@@ -113,11 +113,11 @@ contract Router {
     /* ===================================================== */
 
     function claimPnL() external {
-        REF_DOMAIN(REF_DOMAIN);
+        perp.claimPnL(msg.sender);
     }
 
     function claimPnLToMargin() external {
-    REF_DOMAIN(REF_DOMAIN);
+    perp.claimPnLToMargin(msg.sender);
 }
 
 
@@ -126,7 +126,7 @@ contract Router {
         view
         returns (int256)
     {
-        return REF_DOMAIN(user);
+        return perp.getClaimablePnL(user);
     }
 
     /* ===================================================== */
@@ -144,7 +144,7 @@ contract Router {
             bool isOpen
         )
     {
-        return REF_DOMAIN(user, positionId);
+        return perp.getPosition(user, positionId);
     }
 
     function getMargin(address user)
@@ -152,7 +152,7 @@ contract Router {
         view
         returns (uint256)
     {
-        return REF_DOMAIN(user);
+        return perp.getMargin(user);
     }
 
     function getUserPositionIds(address user)
@@ -160,6 +160,6 @@ contract Router {
         view
         returns (uint256[] memory)
     {
-        return REF_DOMAIN(user);
+        return perp.getUserPositionIds(user);
     }
 }

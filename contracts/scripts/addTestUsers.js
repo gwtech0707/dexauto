@@ -2,7 +2,7 @@ const hre = require("hardhat");
 
 /**
  * ============================================================
- * REF_DOMAIN
+ * addTestUsers.js
  * ============================================================
  *
  * 既存デプロイ済み環境に対して：
@@ -17,16 +17,16 @@ const hre = require("hardhat");
  */
 
 async function main() {
-  const [deployer] = await REF_DOMAIN();
-  const network = REF_DOMAIN;
+  const [deployer] = await hre.ethers.getSigners();
+  const network = hre.network.name;
 
-  REF_DOMAIN("====================================");
-  REF_DOMAIN("Network:", network);
-  REF_DOMAIN("Deployer:", REF_DOMAIN);
-  REF_DOMAIN("====================================");
+  console.log("====================================");
+  console.log("Network:", network);
+  console.log("Deployer:", deployer.address);
+  console.log("====================================");
 
   // ====== 設定 ======
-  const AMOUNT = REF_DOMAIN("10000"); // 1ユーザーあたり
+  const AMOUNT = hre.ethers.parseEther("10000"); // 1ユーザーあたり
 
   // ★ ここに増やしたいアドレスを追加するだけ
   const USERS = [
@@ -37,58 +37,58 @@ async function main() {
   // ====== deployments 読み込み ======
   const deployments = require(`../deployments/${network}.json`);
 
-  const token = await REF_DOMAIN(
+  const token = await hre.ethers.getContractAt(
     "MockERC20",
-    REF_DOMAIN
+    deployments.CollateralToken
   );
 
-  const pool = await REF_DOMAIN(
+  const pool = await hre.ethers.getContractAt(
     "LiquidityPool",
-    REF_DOMAIN
+    deployments.LiquidityPool
   );
 
-  REF_DOMAIN("CollateralToken:", REF_DOMAIN);
-  REF_DOMAIN("LiquidityPool:", REF_DOMAIN);
-  REF_DOMAIN("====================================");
+  console.log("CollateralToken:", token.target);
+  console.log("LiquidityPool:", pool.target);
+  console.log("====================================");
 
   // ====== 処理 ======
   for (const user of USERS) {
-    REF_DOMAIN("---- User:", user);
+    console.log("---- User:", user);
 
-    const bal = await REF_DOMAIN(user);
+    const bal = await token.balanceOf(user);
     if (bal < AMOUNT) {
-      REF_DOMAIN(" minting tUSD...");
-      await (await REF_DOMAIN(user, AMOUNT)).wait();
+      console.log(" minting tUSD...");
+      await (await token.mint(user, AMOUNT)).wait();
     } else {
-      REF_DOMAIN(" tUSD already sufficient");
+      console.log(" tUSD already sufficient");
     }
 
-    const allowance = await REF_DOMAIN(user, REF_DOMAIN);
+    const allowance = await token.allowance(user, pool.target);
     if (allowance < AMOUNT) {
-      REF_DOMAIN(" approving...");
-      const tokenAsUser = REF_DOMAIN(
-        await REF_DOMAIN(user)
+      console.log(" approving...");
+      const tokenAsUser = token.connect(
+        await hre.ethers.getSigner(user)
       );
-      await (await REF_DOMAIN(REF_DOMAIN, AMOUNT)).wait();
+      await (await tokenAsUser.approve(pool.target, AMOUNT)).wait();
     } else {
-      REF_DOMAIN(" approve already set");
+      console.log(" approve already set");
     }
 
-    REF_DOMAIN(" depositing margin...");
-    const poolAsUser = REF_DOMAIN(
-      await REF_DOMAIN(user)
+    console.log(" depositing margin...");
+    const poolAsUser = pool.connect(
+      await hre.ethers.getSigner(user)
     );
-    await (await REF_DOMAIN(user, AMOUNT)).wait();
+    await (await poolAsUser.deposit(user, AMOUNT)).wait();
 
-    REF_DOMAIN(" ✅ ready");
+    console.log(" ✅ ready");
   }
 
-  REF_DOMAIN("====================================");
-  REF_DOMAIN("ALL USERS INITIALIZED");
-  REF_DOMAIN("====================================");
+  console.log("====================================");
+  console.log("ALL USERS INITIALIZED");
+  console.log("====================================");
 }
 
 main().catch((error) => {
-  REF_DOMAIN(error);
-  REF_DOMAIN = 1;
+  console.error(error);
+  process.exitCode = 1;
 });

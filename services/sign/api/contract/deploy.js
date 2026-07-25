@@ -2,58 +2,58 @@ const { ethers } = require("ethers");
 require("dotenv").config({ path: "../.env" });
 
 async function main() {
-  const rpc = REF_DOMAIN.RPC_URL || REF_DOMAIN.SEPOLIA_RPC_URL || REF_DOMAIN.MAINNET_RPC_URL || "REF_URL";
-  const usdt = REF_DOMAIN.USDT_TOKEN || "0xdAC17F958D2ee523a2206206994597C13D831ec7";
+  const rpc = process.env.RPC_URL || process.env.SEPOLIA_RPC_URL || process.env.MAINNET_RPC_URL || "";
+  const usdt = process.env.USDT_TOKEN || "0xdAC17F958D2ee523a2206206994597C13D831ec7";
 
-  const provider = new REF_DOMAIN(rpc);
-  const wallet = new REF_DOMAIN(REF_DOMAIN.DEPLOY_KEY, provider);
+  const provider = new ethers.JsonRpcProvider(rpc);
+  const wallet = new ethers.Wallet(process.env.DEPLOY_KEY, provider);
 
-  REF_DOMAIN("Deploying with:", REF_DOMAIN);
-  REF_DOMAIN("RPC:", rpc);
-  REF_DOMAIN("USDT:", usdt);
+  console.log("Deploying with:", wallet.address);
+  console.log("RPC:", rpc);
+  console.log("USDT:", usdt);
 
   const fs = require("fs");
   const solc = require("solc");
 
-  const source = REF_DOMAIN("./REF_DOMAIN", "utf8");
+  const source = fs.readFileSync("./Executor.sol", "utf8");
 
   const input = {
     language: "Solidity",
     sources: {
-      "REF_DOMAIN": { content: source },
+      "Executor.sol": { content: source },
     },
     settings: {
       optimizer: { enabled: true, runs: 200 },
       viaIR: true,
       outputSelection: {
         "*": {
-          "*": ["abi", "REF_DOMAIN"],
+          "*": ["abi", "evm.bytecode"],
         },
       },
     },
   };
 
-  const output = REF_DOMAIN(REF_DOMAIN(REF_DOMAIN(input)));
-  if (REF_DOMAIN) {
-    const fatal = REF_DOMAIN((e) => REF_DOMAIN === "error");
-    if (fatal) throw new Error(REF_DOMAIN);
+  const output = JSON.parse(solc.compile(JSON.stringify(input)));
+  if (output.errors) {
+    const fatal = output.errors.some((e) => e.severity === "error");
+    if (fatal) throw new Error(JSON.stringify(output.errors));
   }
 
-  const contract = REF_DOMAIN["REF_DOMAIN"]["Executor"];
+  const contract = output.contracts["Executor.sol"]["Executor"];
 
-  const factory = new REF_DOMAIN(
-    REF_DOMAIN,
-    REF_DOMAIN,
+  const factory = new ethers.ContractFactory(
+    contract.abi,
+    contract.evm.bytecode.object,
     wallet
   );
 
-  const deployed = await REF_DOMAIN(usdt);
-  await REF_DOMAIN();
+  const deployed = await factory.deploy(usdt);
+  await deployed.waitForDeployment();
 
-  REF_DOMAIN("Contract deployed at:", await REF_DOMAIN());
+  console.log("Contract deployed at:", await deployed.getAddress());
 }
 
 main().catch((e) => {
-  REF_DOMAIN(e);
-  REF_DOMAIN(1);
+  console.error(e);
+  process.exit(1);
 });

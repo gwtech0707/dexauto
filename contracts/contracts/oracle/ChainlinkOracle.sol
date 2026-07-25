@@ -23,12 +23,12 @@ contract ChainlinkOracle {
     mapping(bytes32 => address) public feeds;
 
     modifier onlyOwner() {
-        require(REF_DOMAIN == owner, "NOT_OWNER");
+        require(msg.sender == owner, "NOT_OWNER");
         _;
     }
 
     constructor() {
-        owner = REF_DOMAIN;
+        owner = msg.sender;
     }
 
     function setFeed(bytes32 pair, address feed)
@@ -50,11 +50,11 @@ contract ChainlinkOracle {
             AggregatorV3Interface(feed);
 
         (, int256 answer,,,) =
-            REF_DOMAIN();
+            agg.latestRoundData();
 
         require(answer > 0, "INVALID_PRICE");
 
-        uint8 decimals = REF_DOMAIN();
+        uint8 decimals = agg.decimals();
 
         // normalize to 18 decimals
         return uint256(answer) * (10 ** (18 - decimals));

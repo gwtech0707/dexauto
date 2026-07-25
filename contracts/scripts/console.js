@@ -1,4 +1,4 @@
-// contracts/scripts/REF_DOMAIN
+// contracts/scripts/console.js
 const fs = require("fs");
 const path = require("path");
 
@@ -6,59 +6,59 @@ async function load() {
   const hre = require("hardhat");
 
   // ===== load deployment json =====
-  const addresses = REF_DOMAIN(
-    REF_DOMAIN(
-      REF_DOMAIN(__dirname, "../deployments/REF_DOMAIN"),
+  const addresses = JSON.parse(
+    fs.readFileSync(
+      path.resolve(__dirname, "../deployments/sepolia.json"),
       "utf8"
     )
   );
 
   // ===== signer =====
-  const signers = await REF_DOMAIN();
+  const signers = await hre.ethers.getSigners();
   const user = signers[0]; // ← ここが重要
 
-  REF_DOMAIN = REF_DOMAIN;
+  global.USER = user.address;
 
   // ===== contracts =====
-  REF_DOMAIN = await REF_DOMAIN(
+  global.token = await hre.ethers.getContractAt(
     "MockERC20",
-    REF_DOMAIN
+    addresses.CollateralToken
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.plp = await hre.ethers.getContractAt(
     "PLP",
-    REF_DOMAIN
+    addresses.PLP
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.pool = await hre.ethers.getContractAt(
     "LiquidityPool",
-    REF_DOMAIN
+    addresses.LiquidityPool
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.oracle = await hre.ethers.getContractAt(
     "PriceOracle",
-    REF_DOMAIN
+    addresses.PriceOracle
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.perp = await hre.ethers.getContractAt(
     "PerpetualTrading",
-    REF_DOMAIN
+    addresses.PerpetualTrading
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.router = await hre.ethers.getContractAt(
     "Router",
-    REF_DOMAIN
+    addresses.Router
   );
 
-  REF_DOMAIN = await REF_DOMAIN(
+  global.liquidation = await hre.ethers.getContractAt(
   "LiquidationEngine",
-  REF_DOMAIN
+  addresses.LiquidationEngine
 );
 
 
-  REF_DOMAIN("✅ console initialized");
-  REF_DOMAIN("USER:", USER);
-  REF_DOMAIN("Router:", await REF_DOMAIN());
+  console.log("✅ console initialized");
+  console.log("USER:", USER);
+  console.log("Router:", await router.getAddress());
 }
 
-REF_DOMAIN = load;
+module.exports = load;

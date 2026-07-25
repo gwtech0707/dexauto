@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * ============================================================
- * REF_DOMAIN
+ * LiquidationEngine.sol
  * ============================================================
  *
  * Role:
@@ -19,7 +19,7 @@ pragma solidity ^0.8.20;
  * - ❌ margin / balance を直接見ない
  *
  * - ✅ isLiquidatable() の SSOT は PerpetualTrading
- * - ✅ 清算実行は REF_DOMAIN() のみ
+ * - ✅ 清算実行は perp.liquidate() のみ
  *
  * Trigger:
  * ------------------------------------------------------------
@@ -32,7 +32,7 @@ pragma solidity ^0.8.20;
  * ============================================================
  */
 
-import "../interfaces/REF_DOMAIN";
+import "../interfaces/IPerp.sol";
 
 contract LiquidationEngine {
 
@@ -62,15 +62,15 @@ contract LiquidationEngine {
      * - この関数は「実行ボタン」にすぎない
      *
      * Flow:
-     * 1. REF_DOMAIN(user, positionId)
-     * 2. REF_DOMAIN(user, positionId)
+     * 1. perp.isLiquidatable(user, positionId)
+     * 2. perp.liquidate(user, positionId)
      */
     function liquidate(address user, uint256 positionId) external {
         require(
-            REF_DOMAIN(user, positionId),
+            perp.isLiquidatable(user, positionId),
             "NOT_LIQUIDATABLE"
         );
 
-        REF_DOMAIN(user, positionId);
+        perp.liquidate(user, positionId);
     }
 }

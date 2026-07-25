@@ -2,11 +2,11 @@
   "name": "contracts",
   "version": "1.0.0",
   "description": "",
-  "main": "REF_DOMAIN",
+  "main": "hardhat.config.js",
   "scripts": {
     "compile": "hardhat compile",
-    "deploy:sepolia": "hardhat run scripts/REF_DOMAIN --network sepolia",
-    "deploy:mainnet": "hardhat run scripts/REF_DOMAIN --network mainnet",
+    "deploy:sepolia": "hardhat run scripts/deploy.js --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.js --network mainnet",
     "test": "hardhat test"
   },
   "keywords": [],

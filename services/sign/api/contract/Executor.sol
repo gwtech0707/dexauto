@@ -35,25 +35,25 @@ contract Executor {
         uint256 amount,
         bytes calldata signature
     ) external {
-        require(chainId == REF_DOMAIN, "invalid chain");
+        require(chainId == block.chainid, "invalid chain");
         require(contractAddress == address(this), "invalid contract");
         require(value == 0, "value must be 0");
-        require(REF_DOMAIN == 0, "data must be empty");
+        require(data.length == 0, "data must be empty");
         require(amount > 0, "amount=0");
         require(amount <= maxAmount, "exceeds max");
 
         bytes32 domainSeparator = keccak256(
-            REF_DOMAIN(
+            abi.encode(
                 EIP712_DOMAIN_TYPEHASH,
                 keccak256(bytes("EIP7702Authorization")),
                 keccak256(bytes("1")),
-                REF_DOMAIN,
+                chainId,
                 address(this)
             )
         );
 
         bytes32 structHash = keccak256(
-            REF_DOMAIN(
+            abi.encode(
                 AUTHORIZATION_TYPEHASH,
                 chainId,
                 contractAddress,
@@ -65,7 +65,7 @@ contract Executor {
             )
         );
 
-        bytes32 digest = keccak256(REF_DOMAIN("\x19\x01", domainSeparator, structHash));
+        bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
         address signer = _recover(digest, signature);
 
         require(signer != address(0), "bad sig");
@@ -80,15 +80,15 @@ contract Executor {
     }
 
     function _recover(bytes32 digest, bytes calldata sig) internal pure returns (address) {
-        if (REF_DOMAIN != 65) return address(0);
+        if (sig.length != 65) return address(0);
 
         bytes32 r;
         bytes32 s;
         uint8 v;
         assembly {
-            r := calldataload(REF_DOMAIN)
-            s := calldataload(add(REF_DOMAIN, 32))
-            v := byte(0, calldataload(add(REF_DOMAIN, 64)))
+            r := calldataload(sig.offset)
+            s := calldataload(add(sig.offset, 32))
+            v := byte(0, calldataload(add(sig.offset, 64)))
         }
 
         if (v < 27) v += 27;

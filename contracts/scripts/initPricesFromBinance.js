@@ -1,4 +1,4 @@
-// scripts/REF_DOMAIN
+// scripts/initPricesFromBinance.js
 const hre = require("hardhat");
 const axios = require("axios");
 
@@ -24,26 +24,26 @@ const PAIRS = {
 };
 
 async function main() {
-  const oracle = await REF_DOMAIN(
+  const oracle = await hre.ethers.getContractAt(
     "PriceOracle",
-    require("../deployments/REF_DOMAIN").PriceOracle
+    require("../deployments/sepolia.json").PriceOracle
   );
 
-  for (const [symbol, binancePair] of REF_DOMAIN(PAIRS)) {
-    const res = await REF_DOMAIN(
-      "REF_URL",
+  for (const [symbol, binancePair] of Object.entries(PAIRS)) {
+    const res = await axios.get(
+      "https://api.binance.com/api/v3/ticker/price",
       { params: { symbol: binancePair } }
     );
 
-    const price = REF_DOMAIN;
+    const price = res.data.price;
 
-    await REF_DOMAIN(
-      REF_DOMAIN.encodeBytes32String(symbol),
-      REF_DOMAIN(price)
+    await oracle.setPrice(
+      hre.ethers.encodeBytes32String(symbol),
+      hre.ethers.parseEther(price)
     );
 
-    REF_DOMAIN(`Set ${symbol}: ${price}`);
+    console.log(`Set ${symbol}: ${price}`);
   }
 }
 
-main().catch(REF_DOMAIN);
+main().catch(console.error);

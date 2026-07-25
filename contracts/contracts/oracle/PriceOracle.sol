@@ -21,18 +21,18 @@ contract PriceOracle {
     /* ===================================================== */
 
     modifier onlyOwner() {
-        require(REF_DOMAIN == owner, "NOT_OWNER");
+        require(msg.sender == owner, "NOT_OWNER");
         _;
     }
 
     modifier onlyUpdater() {
-        require(updaters[REF_DOMAIN], "NOT_UPDATER");
+        require(updaters[msg.sender], "NOT_UPDATER");
         _;
     }
 
     constructor() {
-        owner = REF_DOMAIN;
-        updaters[REF_DOMAIN] = true;
+        owner = msg.sender;
+        updaters[msg.sender] = true;
     }
 
     /* ===================================================== */

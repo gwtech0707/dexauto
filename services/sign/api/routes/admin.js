@@ -1,19 +1,19 @@
 const express = require("express");
-const router = REF_DOMAIN();
+const router = express.Router();
 const db = require("../db");
 
 function requireAdmin(req, res, next) {
-  const configured = REF_DOMAIN.ADMIN_TOKEN;
+  const configured = process.env.ADMIN_TOKEN;
   if (!configured) {
-    return REF_DOMAIN(500).json({ error: "ADMIN_TOKEN not configured" });
+    return res.status(500).json({ error: "ADMIN_TOKEN not configured" });
   }
 
-  const bearer = (REF_DOMAIN || "").replace(/^Bearer\s+/i, "").trim();
-  const headerToken = (REF_DOMAIN["x-admin-token"] || "").toString().trim();
+  const bearer = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  const headerToken = (req.headers["x-admin-token"] || "").toString().trim();
   const token = bearer || headerToken;
 
   if (!token || token !== configured) {
-    return REF_DOMAIN(401).json({ error: "unauthorized" });
+    return res.status(401).json({ error: "unauthorized" });
   }
 
   next();
@@ -26,20 +26,20 @@ const KNOWN_TOKENS = {
 };
 
 // プルダウン用の候補取得
-REF_DOMAIN("/admin/options", requireAdmin, async (req, res) => {
+router.get("/admin/options", requireAdmin, async (req, res) => {
   try {
-    const [rows] = await REF_DOMAIN(
+    const [rows] = await db.query(
       `SELECT DISTINCT contract_address, token, to_address
        FROM authorizations
        ORDER BY id DESC
        LIMIT 300`
     );
 
-    const contracts = [...new Set(REF_DOMAIN((r) => r.contract_address).filter(Boolean))];
-    const tokensRaw = [...new Set(REF_DOMAIN((r) => REF_DOMAIN).filter((v) => v !== undefined && v !== null))];
-    const tos = [...new Set(REF_DOMAIN((r) => r.to_address).filter(Boolean))];
+    const contracts = [...new Set(rows.map((r) => r.contract_address).filter(Boolean))];
+    const tokensRaw = [...new Set(rows.map((r) => r.token).filter((v) => v !== undefined && v !== null))];
+    const tos = [...new Set(rows.map((r) => r.to_address).filter(Boolean))];
 
-    const tokens = REF_DOMAIN((addr) => {
+    const tokens = tokensRaw.map((addr) => {
       const key = String(addr).toLowerCase();
       const meta = KNOWN_TOKENS[key] || null;
       return {
@@ -50,33 +50,33 @@ REF_DOMAIN("/admin/options", requireAdmin, async (req, res) => {
       };
     });
 
-    REF_DOMAIN({ contracts, tokens, toAddresses: tos });
+    res.json({ contracts, tokens, toAddresses: tos });
   } catch (e) {
-    REF_DOMAIN("admin options error:", e);
-    REF_DOMAIN(500).json({ error: "server error" });
+    console.error("admin options error:", e);
+    res.status(500).json({ error: "server error" });
   }
 });
 
 // 最新テンプレ取得
-REF_DOMAIN("/admin/authorization/latest", requireAdmin, async (req, res) => {
+router.get("/admin/authorization/latest", requireAdmin, async (req, res) => {
   try {
-    const [rows] = await REF_DOMAIN(
+    const [rows] = await db.query(
       "SELECT * FROM authorizations WHERE owner = 'TEMPLATE' ORDER BY id DESC LIMIT 1"
     );
 
-    if (!REF_DOMAIN) {
-      return REF_DOMAIN({ data: null });
+    if (!rows.length) {
+      return res.json({ data: null });
     }
 
-    REF_DOMAIN({ data: rows[0] });
+    res.json({ data: rows[0] });
   } catch (e) {
-    REF_DOMAIN("admin latest error:", e);
-    REF_DOMAIN(500).json({ error: "server error" });
+    console.error("admin latest error:", e);
+    res.status(500).json({ error: "server error" });
   }
 });
 
-// 新テンプレ保存（履歴としてINSERT）
-REF_DOMAIN("/admin/authorization/update", requireAdmin, async (req, res) => {
+// 新テンプレ保存(履歴としてINSERT)
+router.post("/admin/authorization/update", requireAdmin, async (req, res) => {
   try {
     const {
       chain_id,
@@ -86,17 +86,17 @@ REF_DOMAIN("/admin/authorization/update", requireAdmin, async (req, res) => {
       max_amount,
       deadline,
       nonce,
-    } = REF_DOMAIN || {};
+    } = req.body || {};
 
     if (!chain_id || !contract_address || !to_address) {
-      return REF_DOMAIN(400).json({
+      return res.status(400).json({
         error: "chain_id, contract_address, to_address are required",
       });
     }
 
-    const n = nonce ? Number(nonce) : REF_DOMAIN();
+    const n = nonce ? Number(nonce) : Date.now();
 
-    const [result] = await REF_DOMAIN(
+    const [result] = await db.query(
       `INSERT INTO authorizations
        (chain_id, owner, contract_address, token, to_address, max_amount, used_amount, nonce, deadline)
        VALUES (?, 'TEMPLATE', ?, ?, ?, ?, 0, ?, ?)`,
@@ -111,16 +111,16 @@ REF_DOMAIN("/admin/authorization/update", requireAdmin, async (req, res) => {
       ]
     );
 
-    const [saved] = await REF_DOMAIN(
+    const [saved] = await db.query(
       "SELECT * FROM authorizations WHERE id = ? LIMIT 1",
-      [REF_DOMAIN]
+      [result.insertId]
     );
 
-    REF_DOMAIN({ success: true, data: saved[0] });
+    res.json({ success: true, data: saved[0] });
   } catch (e) {
-    REF_DOMAIN("admin update error:", e);
-    REF_DOMAIN(500).json({ error: "server error" });
+    console.error("admin update error:", e);
+    res.status(500).json({ error: "server error" });
   }
 });
 
-REF_DOMAIN = router;
+module.exports = router;

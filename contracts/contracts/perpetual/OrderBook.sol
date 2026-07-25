@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../interfaces/REF_DOMAIN";
+import "../interfaces/IOrderBook.sol";
 
 contract OrderBook is IOrderBook {
     Order[] public orders;
@@ -12,7 +12,7 @@ contract OrderBook is IOrderBook {
         uint256 price,
         bool isLong
     ) external override {
-        REF_DOMAIN(Order(user, size, price, isLong));
+        orders.push(Order(user, size, price, isLong));
     }
 
     function getOrders()
@@ -30,6 +30,6 @@ contract OrderBook is IOrderBook {
         override
         returns (uint256)
     {
-        return REF_DOMAIN;
+        return orders.length;
     }
 }

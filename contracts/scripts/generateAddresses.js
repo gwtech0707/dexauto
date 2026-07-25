@@ -3,17 +3,17 @@ const path = require("path");
 
 const network = "sepolia";
 
-const src = REF_DOMAIN(
+const src = path.resolve(
   __dirname,
   `../deployments/${network}.json`
 );
 
-const dst = REF_DOMAIN(
+const dst = path.resolve(
   __dirname,
-  "../../services/perpx-frontend/client/src/lib/eth/REF_DOMAIN"
+  "../../perpx-frontend/client/src/lib/eth/addresses.ts"
 );
 
-const data = REF_DOMAIN(REF_DOMAIN(src, "utf8"));
+const data = JSON.parse(fs.readFileSync(src, "utf8"));
 
 const content = `
 // ⚠️ AUTO-GENERATED FILE
@@ -21,16 +21,16 @@ const content = `
 // Generated from contracts/deployments/${network}.json
 
 export const CONTRACTS = {
-  COLLATERAL_TOKEN: "${REF_DOMAIN}",
-  PLP: "${REF_DOMAIN}",
-  LIQUIDITY_POOL: "${REF_DOMAIN}",
-  PRICE_ORACLE: "${REF_DOMAIN}",
-  PERPETUAL_TRADING: "${REF_DOMAIN}",
-  LIQUIDATION_ENGINE: "${REF_DOMAIN}",
-  ROUTER: "${REF_DOMAIN}",
-  CHAINLINK_ORACLE: "${REF_DOMAIN}",
+  COLLATERAL_TOKEN: "${data.CollateralToken}",
+  PLP: "${data.PLP}",
+  LIQUIDITY_POOL: "${data.LiquidityPool}",
+  PRICE_ORACLE: "${data.PriceOracle}",
+  PERPETUAL_TRADING: "${data.PerpetualTrading}",
+  LIQUIDATION_ENGINE: "${data.LiquidationEngine}",
+  ROUTER: "${data.Router}",
+  CHAINLINK_ORACLE: "${data.ChainlinkOracle}",
 } as const;
 `;
 
-REF_DOMAIN(dst, REF_DOMAIN());
-REF_DOMAIN("✅ REF_DOMAIN generated");
+fs.writeFileSync(dst, content.trim());
+console.log("✅ addresses.ts generated");

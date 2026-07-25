@@ -47,12 +47,12 @@ contract UserAccessControl {
     /* ===================================================== */
 
     modifier onlyAdmin() {
-        require(REF_DOMAIN == admin, "NOT_ADMIN");
+        require(msg.sender == admin, "NOT_ADMIN");
         _;
     }
 
     modifier onlyAuthorized() {
-        require(isAuthorized[REF_DOMAIN], "NOT_AUTHORIZED");
+        require(isAuthorized[msg.sender], "NOT_AUTHORIZED");
         _;
     }
 
@@ -61,9 +61,9 @@ contract UserAccessControl {
     /* ===================================================== */
 
     constructor() {
-        admin = REF_DOMAIN;
-        isAuthorized[REF_DOMAIN] = true;
-        emit UserAdded(REF_DOMAIN);
+        admin = msg.sender;
+        isAuthorized[msg.sender] = true;
+        emit UserAdded(msg.sender);
     }
 
     /* ===================================================== */
@@ -101,14 +101,14 @@ contract UserAccessControl {
 
     function selfRegister() external {
         require(allowSelfRegister, "SELF_REGISTER_DISABLED");
-        isAuthorized[REF_DOMAIN] = true;
-        emit UserAdded(REF_DOMAIN);
+        isAuthorized[msg.sender] = true;
+        emit UserAdded(msg.sender);
     }
 
     function selfUnregister() external {
-        require(REF_DOMAIN != admin, "ADMIN_CANNOT_UNREGISTER");
-        isAuthorized[REF_DOMAIN] = false;
-        emit UserRemoved(REF_DOMAIN);
+        require(msg.sender != admin, "ADMIN_CANNOT_UNREGISTER");
+        isAuthorized[msg.sender] = false;
+        emit UserRemoved(msg.sender);
     }
 
     /* ===================================================== */

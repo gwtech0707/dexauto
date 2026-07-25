@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * ============================================================
- * REF_DOMAIN
+ * PerpetualTrading.sol
  * ============================================================
  *
  * Role:
@@ -14,7 +14,7 @@ pragma solidity ^0.8.20;
  * ------------------------------------------------------------
  * - ❌ ERC20 transfer / balance 操作は禁止
  * - ❌ 資金移動は一切しない
- * - ✅ 損失は REF_DOMAIN に完全委譲
+ * - ✅ 損失は LiquidityPool.settlePnL に完全委譲
  * - ✅ 利益は claimablePnL として記録のみ
  * - ✅ Router が唯一の外部入口
  * - ✅ マイナス PnL で絶対に revert しない
@@ -24,9 +24,9 @@ pragma solidity ^0.8.20;
  * ============================================================
  */
 
-import "../interfaces/REF_DOMAIN";
-import "../interfaces/REF_DOMAIN";
-import "../interfaces/REF_DOMAIN";
+import "../interfaces/IPerp.sol";
+import "../interfaces/ILiquidityPool.sol";
+import "../interfaces/IOracle.sol";
 
 contract PerpetualTrading is IPerp {
 
@@ -124,17 +124,17 @@ contract PerpetualTrading is IPerp {
     /* ===================================================== */
 
     modifier onlyOwner() {
-        require(REF_DOMAIN == owner, "NOT_OWNER");
+        require(msg.sender == owner, "NOT_OWNER");
         _;
     }
 
     modifier onlyRouter() {
-        require(REF_DOMAIN == router, "NOT_ROUTER");
+        require(msg.sender == router, "NOT_ROUTER");
         _;
     }
 
     modifier onlyLiquidation() {
-        require(REF_DOMAIN == liquidationEngine, "NOT_LIQUIDATION");
+        require(msg.sender == liquidationEngine, "NOT_LIQUIDATION");
         _;
     }
 
@@ -143,7 +143,7 @@ contract PerpetualTrading is IPerp {
     /* ===================================================== */
 
     constructor(address _oracle, address _liquidityPool) {
-        owner = REF_DOMAIN;
+        owner = msg.sender;
         oracle = IOracle(_oracle);
         liquidityPool = ILiquidityPool(_liquidityPool);
     }
@@ -197,7 +197,7 @@ contract PerpetualTrading is IPerp {
     uint256 requiredMargin = uint256(_abs(size)) / 10;
     require(traderMargin[user] >= requiredMargin, "INSUFFICIENT_MARGIN");
 
-    uint256 price = REF_DOMAIN(pair);
+    uint256 price = oracle.getPrice(pair);
 
     // margin を口座から切り出す
     traderMargin[user] -= requiredMargin;
@@ -231,13 +231,13 @@ contract PerpetualTrading is IPerp {
     onlyRouter
 {
     Position storage pos = positions[user][positionId];
-    require(REF_DOMAIN, "NO_POSITION");
+    require(pos.isOpen, "NO_POSITION");
 
-    uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
-    int256 pnl = _calcPnl(REF_DOMAIN, REF_DOMAIN, exitPrice);
+    uint256 exitPrice = oracle.getPrice(pos.pair);
+    int256 pnl = _calcPnl(pos.size, pos.entryPrice, exitPrice);
 
     // ① ポジション専用 margin を口座に戻す
-    traderMargin[user] += REF_DOMAIN;
+    traderMargin[user] += pos.margin;
 
     // ② PnL を処理
     if (pnl < 0) {
@@ -247,14 +247,14 @@ contract PerpetualTrading is IPerp {
         claimablePnL[user] += pnl;
     }
 
-    REF_DOMAIN = false;
+    pos.isOpen = false;
 
     emit PositionClosed(
         user,
         positionId,
-        REF_DOMAIN,
-        REF_DOMAIN,
-        REF_DOMAIN,
+        pos.pair,
+        pos.size,
+        pos.entryPrice,
         exitPrice,
         pnl
     );
@@ -272,32 +272,32 @@ contract PerpetualTrading is IPerp {
     onlyRouter
 {
     Position storage pos = positions[user][positionId];
-    require(REF_DOMAIN, "NO_POSITION");
+    require(pos.isOpen, "NO_POSITION");
     require(closeSize != 0, "INVALID_CLOSE_SIZE");
 
     require(
-        (REF_DOMAIN > 0 && closeSize > 0) ||
-        (REF_DOMAIN < 0 && closeSize < 0),
+        (pos.size > 0 && closeSize > 0) ||
+        (pos.size < 0 && closeSize < 0),
         "WRONG_DIRECTION"
     );
 
-    require(_abs(closeSize) <= _abs(REF_DOMAIN), "CLOSE_TOO_LARGE");
+    require(_abs(closeSize) <= _abs(pos.size), "CLOSE_TOO_LARGE");
 
-    uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
+    uint256 exitPrice = oracle.getPrice(pos.pair);
 
     // ===== 比率 =====
-    uint256 r = uint256(_abs(closeSize)) * 1e18 / uint256(_abs(REF_DOMAIN));
+    uint256 r = uint256(_abs(closeSize)) * 1e18 / uint256(_abs(pos.size));
 
     // ===== PnL =====
-    int256 totalPnL = _calcPnl(REF_DOMAIN, REF_DOMAIN, exitPrice);
+    int256 totalPnL = _calcPnl(pos.size, pos.entryPrice, exitPrice);
     int256 partialPnL = totalPnL * int256(r) / int256(1e18);
 
     // ===== margin 按分 =====
-    uint256 marginPartial = REF_DOMAIN * r / 1e18;
+    uint256 marginPartial = pos.margin * r / 1e18;
 
     // margin を口座に戻す
     traderMargin[user] += marginPartial;
-    REF_DOMAIN -= marginPartial;
+    pos.margin -= marginPartial;
 
     // PnL 処理
     if (partialPnL < 0) {
@@ -307,17 +307,17 @@ contract PerpetualTrading is IPerp {
     }
 
     // size 更新
-    REF_DOMAIN -= closeSize;
-    if (REF_DOMAIN == 0) {
-        REF_DOMAIN = false;
+    pos.size -= closeSize;
+    if (pos.size == 0) {
+        pos.isOpen = false;
     }
 
     emit PositionPartiallyClosed(
         user,
         positionId,
-        REF_DOMAIN,
+        pos.pair,
         closeSize,
-        REF_DOMAIN,
+        pos.size,
         exitPrice,
         partialPnL
     );
@@ -336,13 +336,13 @@ contract PerpetualTrading is IPerp {
     onlyLiquidation
 {
     Position storage pos = positions[user][positionId];
-    require(REF_DOMAIN, "NO_POSITION");
+    require(pos.isOpen, "NO_POSITION");
 
-    uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
-    int256 pnl = _calcPnl(REF_DOMAIN, REF_DOMAIN, exitPrice);
+    uint256 exitPrice = oracle.getPrice(pos.pair);
+    int256 pnl = _calcPnl(pos.size, pos.entryPrice, exitPrice);
 
     // ① margin を口座に戻す
-    traderMargin[user] += REF_DOMAIN;
+    traderMargin[user] += pos.margin;
 
     // ② PnL を即時精算
     if (pnl < 0) {
@@ -351,14 +351,14 @@ contract PerpetualTrading is IPerp {
         claimablePnL[user] += pnl; // PoC では skip しても可
     }
 
-    REF_DOMAIN = false;
+    pos.isOpen = false;
 
     emit PositionLiquidated(
         user,
         positionId,
-        REF_DOMAIN,
-        REF_DOMAIN,
-        REF_DOMAIN,
+        pos.pair,
+        pos.size,
+        pos.entryPrice,
         exitPrice,
         pnl
     );
@@ -377,7 +377,7 @@ contract PerpetualTrading is IPerp {
         require(pnl > 0, "NO_PROFIT");
 
         claimablePnL[user] = 0;
-        REF_DOMAIN(user, uint256(pnl));
+        liquidityPool.payProfit(user, uint256(pnl));
     }
 
     function addClaimablePnL(address user, int256 pnl)
@@ -425,7 +425,7 @@ contract PerpetualTrading is IPerp {
         )
     {
         Position memory p = positions[user][positionId];
-        return (REF_DOMAIN, REF_DOMAIN, REF_DOMAIN, REF_DOMAIN, REF_DOMAIN);
+        return (p.pair, p.size, p.entryPrice, p.margin, p.isOpen);
     }
 
     function getMargin(address user)
@@ -453,10 +453,10 @@ contract PerpetualTrading is IPerp {
         returns (bool)
     {
         Position memory pos = positions[user][positionId];
-        if (!REF_DOMAIN) return false;
+        if (!pos.isOpen) return false;
 
-        uint256 exitPrice = REF_DOMAIN(REF_DOMAIN);
-        int256 pnl = _calcPnl(REF_DOMAIN, REF_DOMAIN, exitPrice);
+        uint256 exitPrice = oracle.getPrice(pos.pair);
+        int256 pnl = _calcPnl(pos.size, pos.entryPrice, exitPrice);
 
         if (pnl >= 0) return false;
 
@@ -470,7 +470,7 @@ contract PerpetualTrading is IPerp {
 
     function _settlePnL(address user, int256 pnl) internal {
         if (pnl < 0) {
-            REF_DOMAIN(user, pnl);
+            liquidityPool.settlePnL(user, pnl);
         } else if (pnl > 0) {
             claimablePnL[user] += pnl;
         }

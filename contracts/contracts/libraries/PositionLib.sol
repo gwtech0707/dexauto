@@ -13,10 +13,10 @@ library PositionLib {
         pure
         returns (int256)
     {
-        if (REF_DOMAIN) {
-            return (int256(price) - int256(REF_DOMAIN)) * REF_DOMAIN;
+        if (pos.isLong) {
+            return (int256(price) - int256(pos.entryPrice)) * pos.size;
         } else {
-            return (int256(REF_DOMAIN) - int256(price)) * REF_DOMAIN;
+            return (int256(pos.entryPrice) - int256(price)) * pos.size;
         }
     }
 }
