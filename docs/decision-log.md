@@ -244,3 +244,41 @@ Akiの承認範囲に従い、Sepolia上での実際のトランザクション�
 
 **次に判断が必要な事項**: Sepolia上での実際のトランザクション実行（デプロイ・
 approve・execute/approve）に進んでよいか。Akiへの確認待ち。
+（2026-07-28追記: 本項目は司令塔から「今回対象外」と指示されたため一時中断。
+生成済みの使い捨てウォレット2件・Docker MySQLコンテナは次回再開まで保持する）
+
+---
+
+## 2026-07-28: ドメイン公開に向けた静的配信整備とポート設定
+
+**対応**: 指示書`2026-07-28_ドメイン公開に向けた静的配信整備とポート設定.md`に基づき、
+`services/sign/api/server.js`に静的ファイル配信を追加し、ポートを3001→3200に変更した。
+
+**実装方針とその理由**: `services/sign/`ディレクトリ全体を`express.static`で
+配信する単純な実装は行わなかった。これを行うと`api/`サブディレクトリ内の
+`.env`（DBパスワード・管理者トークン）や`db.js`・`routes/*.js`のソースコードまで
+外部から直接ダウンロード可能になる重大なセキュリティ問題があるため。代わりに
+`vendor/`・`admin/`のみを`express.static`で個別マウントし、`index.html`・
+`style.css`・`app.js`は明示的なルート（`app.get`）で個別に配信する形にした。
+`api/`ディレクトリは静的配信のマウント対象に一切含めていない。
+
+**動作確認**（Docker MySQLコンテナ`dexauto-mysql-test`を使用、ポート3200で
+実際に起動して確認。確認後プロセスは停止済み・常駐化はしていない）:
+- `GET /services/sign/` → 200、署名ページのHTML取得OK
+- `GET /services/sign/vendor/ethers.umd.min.js` → 200
+- `GET /services/sign/admin/` → 200、管理画面トップ取得OK
+- `GET /services/sign/admin/template.js` → 200
+- セキュリティ確認: `/services/sign/api/.env`・`/services/sign/api/db.js`・
+  `/services/sign/api/server.js`への直接リクエストはいずれも404（静的配信の
+  対象外になっていることを確認）
+- 署名フロー: 使い捨てテストウォレットで`GET /sign-data` → 型付き署名 →
+  `POST /save-signature` → `POST /execute`まで一気通貫でAPIエラーなく動作
+- `execute`失敗時の表示: Sepolia未デプロイのため意図通り失敗するが、元の
+  エラーメッセージ`"unsupported chain"`は開発者向けの技術的な文言で分かりにくい
+  と判断し、`"この環境では実行機能は準備中です(テストネットへのコントラクト
+  デプロイ待ち)"`に軽微な文言修正を行った（`api/routes/execute.js`の
+  `loadAndValidateAuthorization`関数内）。機能自体は変更していない
+
+**やらないこと（指示書通り遵守）**: Sepoliaへのデプロイ・実行、executeを
+動くようにする機能追加、Caddy設定編集、本番プロセスとしての常時起動——いずれも
+今回は着手していない。

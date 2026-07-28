@@ -93,7 +93,7 @@ async function loadAndValidateAuthorization({ id, amount, signature, message }) 
   }
 
   const rpc = RPCS[auth.chain_id];
-  if (!rpc) throw new Error("unsupported chain");
+  if (!rpc) throw new Error("この環境では実行機能は準備中です(テストネットへのコントラクトデプロイ待ち)");
 
   return { auth, parsed, recoveredOwner, rpc, amount: String(amount) };
 }

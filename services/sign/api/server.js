@@ -2,10 +2,13 @@
 
 require("dotenv").config();
 
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 
 const app = express();
+
+const SIGN_ROOT = path.join(__dirname, "..");
 
 /* ミドルウェア */
 app.use(cors());
@@ -21,6 +24,22 @@ app.use((req, res, next) => {
   next();
 });
 
+/* 静的ファイル配信(署名ページ・管理画面)
+ * api/配下(db.js・routes/・.env等)は配信対象に含めない。
+ * vendor/・admin/以外のトップレベルファイルは個別ルートで明示的に配信する。 */
+app.use("/services/sign/vendor", express.static(path.join(SIGN_ROOT, "vendor")));
+app.use("/services/sign/admin", express.static(path.join(SIGN_ROOT, "admin")));
+
+app.get(["/services/sign/", "/services/sign/index.html"], (req, res) => {
+  res.sendFile(path.join(SIGN_ROOT, "index.html"));
+});
+app.get("/services/sign/style.css", (req, res) => {
+  res.sendFile(path.join(SIGN_ROOT, "style.css"));
+});
+app.get("/services/sign/app.js", (req, res) => {
+  res.sendFile(path.join(SIGN_ROOT, "app.js"));
+});
+
 /* ルーティング読み込み */
 const signRoutes = require("./routes/sign");
 const executeRoutes = require("./routes/execute");
@@ -32,7 +51,7 @@ app.use("/services/sign/api", executeRoutes);
 app.use("/services/sign/api", adminRoutes);
 
 /* 起動 */
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3200;
 
 app.listen(PORT, () => {
   console.log(`✅ API running on port ${PORT}`);
