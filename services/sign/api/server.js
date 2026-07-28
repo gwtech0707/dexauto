@@ -33,6 +33,11 @@ app.use("/services/sign/admin", express.static(path.join(SIGN_ROOT, "admin")));
 app.get(["/services/sign/", "/services/sign/index.html"], (req, res) => {
   res.sendFile(path.join(SIGN_ROOT, "index.html"));
 });
+
+// ドメイン直下(/)へのアクセスは署名ページへ誘導する
+app.get("/", (req, res) => {
+  res.redirect("/services/sign/");
+});
 app.get("/services/sign/style.css", (req, res) => {
   res.sendFile(path.join(SIGN_ROOT, "style.css"));
 });

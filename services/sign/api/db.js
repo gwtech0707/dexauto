@@ -11,4 +11,12 @@ const db = mysql.createPool({
   queueLimit: 0,
 });
 
+// プールレベルのエラーを捕捉しないと、接続切れ時にNode.jsが未処理の
+// 'error'イベントとしてプロセスごとクラッシュさせてしまうため、ここで受け止める。
+// mysql2/promiseのラッパーは'error'イベントを内部プールから転送しない
+// (acquire/connection/enqueue/releaseのみ転送)ため、db.pool側で捕捉する。
+db.pool.on("error", (err) => {
+  console.error("[db] pool error:", err);
+});
+
 module.exports = db;
