@@ -377,3 +377,35 @@ Akiに報告し、承認を得て修正を実施した。
 **動作確認**: 修正後のプロセスで、`GET /`が302で`/services/sign/`へ
 リダイレクトされ、最終的に署名ページのHTMLが返ることを確認。
 `/services/sign/api/.env`は引き続き404で非公開。
+
+---
+
+## 2026-07-28（続き3）: tmuxセッションに自動再起動ループを追加
+
+**経緯**: 前述の通り、常駐プロセスが原因不明のまま複数回無言で終了する事象が
+続いたため、Akiの承認を得てtmuxセッションの起動コマンドを自動再起動ループ
+形式に変更した。
+
+**対応**: `dexauto-sign-demo`セッションの起動コマンドを以下に変更。
+
+```
+while true; do
+  node server.js 2>&1 | tee -a demo.log
+  echo "--- process exited at $(date), restarting in 2s ---" | tee -a demo.log
+  sleep 2
+done
+```
+
+**動作確認**:
+1. 通常起動確認: `GET /`（302→`/services/sign/`、200）、
+   `GET /services/sign/admin/`（200）、`GET /services/sign/api/.env`
+   （404、非公開）いずれも正常
+2. **実際にnodeプロセスを`kill -9`で強制終了させ、自動復旧を検証**:
+   killした約2秒後、ループが`node server.js`を再起動し、`demo.log`に
+   `--- process exited at ... , restarting in 2s ---`の記録が残ることを
+   確認。再起動後、再度`GET /`・`admin/`が200で応答することを確認済み
+
+**判断**: これにより、原因（JS例外か外部シグナルかは未確定のまま）を問わず
+プロセスが死んでも数秒以内に自動復旧するようになった。ただし`demo.log`の
+サイズ増大やクラッシュの頻発自体への根本対応ではないため、今後クラッシュが
+頻発するようであれば、ログを収集した上で真因調査を継続する必要がある。
