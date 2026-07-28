@@ -282,3 +282,45 @@ approve・execute/approve）に進んでよいか。Akiへの確認待ち。
 **やらないこと（指示書通り遵守）**: Sepoliaへのデプロイ・実行、executeを
 動くようにする機能追加、Caddy設定編集、本番プロセスとしての常時起動——いずれも
 今回は着手していない。
+
+---
+
+## 2026-07-28（続き）: 公開デモ用の常駐化（Akiの追加承認・チャット指示）
+
+**対応**: Akiから「services/signをポート3200で常駐起動してほしい」との追加指示が
+あり、以下の方針で常駐化した。
+
+**DB分離の判断**: 既存の`dexauto-mysql-test`（Sepolia検証用の使い捨てコンテナ、
+テスト用ダミーデータを含む）は流用せず、公開デモ専用に新規コンテナ
+`dexauto-sign-demo-mysql`（`127.0.0.1:3307`にバインド）を別途構築した。
+理由: Sepolia検証作業の再開時にデータ・スキーマ変更でデモに影響が出ることを
+避けるため、また逆にデモ操作がテスト検証用データを汚さないようにするため。
+`schema.sql`を適用し、デモ用に見た目上動作するTEMPLATE認可レコード1件
+（ダミーアドレス、chain_id=11155111）を投入した。
+
+**副次的に発見した実装漏れ**: `api/db.js`の`mysql.createPool`が`port`オプションを
+一切指定しておらず、`DB_PORT`環境変数が存在しないため常にデフォルトの3306に
+接続する実装になっていた。デモ用DBを3307で待ち受けさせる都合上、
+`port: process.env.DB_PORT || 3306`を追加。既存の動作（3306かつDB_PORT未設定時）
+には影響しない後方互換の追加。
+
+**常駐方法**: tmuxセッション`dexauto-sign-demo`（既存の`dexauto`セッションは
+このClaude Codeリモート接続用のため使用していない）で
+`cd services/sign/api && node server.js`を起動。自動再起動機能は持たない簡易的な
+常駐方式（UI/UXデモ用途のためAki了承の上でこの方式を採用）。
+
+**動作確認**: ポート3200で以下を確認——`GET /services/sign/`（200）、
+`GET /services/sign/admin/`（200）、`GET /services/sign/vendor/ethers.umd.min.js`
+（200）、`GET /services/sign/api/sign-data?owner=...`（デモ用DBから正常にデータ
+取得）、`GET /services/sign/api/.env`（404、非公開のまま）。tmuxセッション・
+Dockerコンテナ・ポート3200のリッスンをいずれも確認し、常駐状態であることを確認。
+
+**現在動いているもの一覧**（次回セッションのための備忘）:
+- tmuxセッション`dexauto-sign-demo`: `node server.js`（ポート3200、公開デモ用）
+- Dockerコンテナ`dexauto-sign-demo-mysql`: デモ用MySQL（`127.0.0.1:3307`）
+- Dockerコンテナ`dexauto-mysql-test`: Sepolia検証用MySQL（`127.0.0.1:3306`、
+  引き続き保持中・デモとは別系統）
+
+**次に判断が必要な事項**: Caddy設定・実際のドメイン公開（`dexauto.server-rules.top`）
+は司令塔・Aki側の作業。今回のローカル変更（`db.js`）のコミットはpushしない
+（Akiから別途確認するまでpush保留の指示あり）。
